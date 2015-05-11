@@ -640,6 +640,92 @@ public class AsyncHttpClient {
         return ret;
     }
 
+
+    public Future<File> executeInterruptFile(AsyncHttpRequest req, final String filename, final FileCallback callback) {
+        final File file = new File(filename);
+        file.getParentFile().mkdirs();
+        final OutputStream fout;
+        try {
+            fout = new BufferedOutputStream(new FileOutputStream(file,true), 8192);
+        }
+        catch (FileNotFoundException e) {
+            SimpleFuture<File> ret = new SimpleFuture<File>();
+            ret.setComplete(e);
+            return ret;
+        }
+        final FutureAsyncHttpResponse cancel = new FutureAsyncHttpResponse();
+        final SimpleFuture<File> ret = new SimpleFuture<File>() {
+            @Override
+            public void cancelCleanup() {
+                try {
+                    cancel.get().setDataCallback(new DataCallback.NullDataCallback());
+                    cancel.get().close();
+                }
+                catch (Exception e) {
+                }
+                try {
+                    fout.close();
+                }
+                catch (Exception e) {
+                }
+                if (delete){
+                    file.delete();
+                }
+
+            }
+        };
+        ret.setParent(cancel);
+        execute(req, 0, cancel, new HttpConnectCallback() {
+            long mDownloaded = 0;
+
+            @Override
+            public void onConnectCompleted(Exception ex, final AsyncHttpResponse response) {
+                if (ex != null) {
+                    try {
+                        fout.close();
+                    }
+                    catch (IOException e) {
+                    }
+                    file.delete();
+                    invoke(callback, ret, response, ex, null);
+                    return;
+                }
+                invokeConnect(callback, response);
+
+                final long contentLength = HttpUtil.contentLength(response.headers());
+
+                response.setDataCallback(new OutputStreamDataCallback(fout) {
+                    @Override
+                    public void onDataAvailable(DataEmitter emitter, ByteBufferList bb) {
+                        mDownloaded += bb.remaining();
+                        super.onDataAvailable(emitter, bb);
+                        invokeProgress(callback, response, mDownloaded, contentLength);
+                    }
+                });
+                response.setEndCallback(new CompletedCallback() {
+                    @Override
+                    public void onCompleted(Exception ex) {
+                        try {
+                            fout.close();
+                        }
+                        catch (IOException e) {
+                            ex = e;
+                        }
+                        if (ex != null) {
+                            file.delete();
+                            invoke(callback, ret, response, ex, null);
+                        }
+                        else {
+                            invoke(callback, ret, response, null, file);
+                        }
+                    }
+                });
+            }
+        });
+        return ret;
+    }
+
+
     public <T> SimpleFuture<T> execute(AsyncHttpRequest req, final AsyncParser<T> parser, final RequestCallback<T> callback) {
         final FutureAsyncHttpResponse cancel = new FutureAsyncHttpResponse();
         final SimpleFuture<T> ret = new SimpleFuture<T>();
