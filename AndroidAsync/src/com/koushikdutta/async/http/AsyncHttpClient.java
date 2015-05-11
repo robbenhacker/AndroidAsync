@@ -587,7 +587,9 @@ public class AsyncHttpClient {
                 }
                 catch (Exception e) {
                 }
-                file.delete();
+                if (delete){
+                    file.delete();
+                }
             }
         };
         ret.setParent(cancel);
@@ -599,8 +601,7 @@ public class AsyncHttpClient {
                 if (ex != null) {
                     try {
                         fout.close();
-                    }
-                    catch (IOException e) {
+                    } catch (IOException e) {
                     }
                     file.delete();
                     invoke(callback, ret, response, ex, null);
@@ -623,15 +624,13 @@ public class AsyncHttpClient {
                     public void onCompleted(Exception ex) {
                         try {
                             fout.close();
-                        }
-                        catch (IOException e) {
+                        } catch (IOException e) {
                             ex = e;
                         }
                         if (ex != null) {
                             file.delete();
                             invoke(callback, ret, response, ex, null);
-                        }
-                        else {
+                        } else {
                             invoke(callback, ret, response, null, file);
                         }
                     }

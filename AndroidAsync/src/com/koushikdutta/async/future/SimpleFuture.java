@@ -13,6 +13,7 @@ public class SimpleFuture<T> extends SimpleCancellable implements DependentFutur
     T result;
     boolean silent;
     FutureCallback<T> callback;
+    protected  boolean delete = true;
 
     public SimpleFuture() {
     }
@@ -26,7 +27,8 @@ public class SimpleFuture<T> extends SimpleCancellable implements DependentFutur
     }
 
     @Override
-    public boolean cancel(boolean mayInterruptIfRunning) {
+    public boolean cancel(boolean delete) {
+        this.delete = delete;
         return cancel();
     }
 
